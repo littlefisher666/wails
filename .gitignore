@@ -1,0 +1,34 @@
+# Wails + Go + Vue 项目忽略规则
+
+# --- 构建产物 ---
+build/bin
+frontend/dist
+
+# Wails 输出二进制（与 wails.json 中 outputfilename 一致）
+/wails
+
+# --- Go ---
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# --- 前端 ---
+node_modules/
+frontend/package.json.md5
+
+# --- 开发与敏感配置 ---
+.wails-dev.log
+.env
+.env.*
+
+# --- 系统与 IDE ---
+.DS_Store
+Thumbs.db
+.idea/
+
+# --- 本地克隆的参考项目（非本仓库源码）---
+test-wails/
