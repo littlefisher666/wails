@@ -163,8 +163,16 @@ jobs:
 
   build-linux-deb:
     name: Build Linux Deb
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
     needs: prepare-release-meta
-    runs-on: ubuntu-24.04
+    runs-on: ${{ matrix.runner }}
 
     steps:
       - name: Checkout source
@@ -206,12 +214,13 @@ jobs:
         run: |
           VERSION="${{ needs.prepare-release-meta.outputs.version }}"
           echo "PACKAGE_VERSION=${VERSION}" >> "$GITHUB_ENV"
+          echo "PACKAGE_ARCH=${{ matrix.arch }}" >> "$GITHUB_ENV"
 
       - name: Build Linux binary
         shell: bash
         run: |
           export PATH="$PATH:$(go env GOPATH)/bin"
-          wails build -clean -platform linux/amd64 -tags webkit2_41
+          wails build -clean -platform linux/${{ matrix.arch }} -tags webkit2_41
 
       - name: Package deb
         shell: bash
@@ -221,20 +230,20 @@ jobs:
           nfpm package \
             --packager deb \
             --config build/linux/nfpm.yaml \
-            --target "dist/${APP_NAME}_${PACKAGE_VERSION}_amd64.deb"
+            --target "dist/${APP_NAME}_${PACKAGE_VERSION}_${PACKAGE_ARCH}.deb"
 
       - name: Upload Linux artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: linux-deb-artifacts
+          name: linux-deb-artifacts-${{ matrix.arch }}
           path: |
-            dist/*.deb
+            dist/*_${{ matrix.arch }}.deb
           if-no-files-found: error
 
       - name: Upload Linux binary artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: linux-bin-artifacts
+          name: linux-bin-artifacts-${{ matrix.arch }}
           path: |
             build/bin/${{ env.BIN_NAME }}
           if-no-files-found: error
@@ -265,7 +274,8 @@ jobs:
       - name: Download Linux artifacts
         uses: actions/download-artifact@v4
         with:
-          name: linux-deb-artifacts
+          pattern: linux-deb-artifacts-*
+          merge-multiple: false
           path: release-assets/linux
 
       - name: Publish release assets
