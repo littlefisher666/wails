@@ -286,7 +286,18 @@ jobs:
       - name: Install Wails CLI and nfpm
         run: |
           go install github.com/wailsapp/wails/v2/cmd/wails@${{ env.WAILS_VERSION }}
-          go install github.com/goreleaser/nfpm/v2/cmd/nfpm@latest
+          NFP_VERSION="v2.46.3"
+          case "${{ matrix.arch }}" in
+            amd64) NFP_ARCH="x86_64" ;;
+            arm64) NFP_ARCH="arm64" ;;
+            *)
+              echo "Unsupported nfpm arch: ${{ matrix.arch }}"
+              exit 1
+              ;;
+          esac
+          curl -sSfL "https://github.com/goreleaser/nfpm/releases/download/${NFP_VERSION}/nfpm_${NFP_VERSION#v}_Linux_${NFP_ARCH}.tar.gz" -o /tmp/nfpm.tar.gz
+          tar -xzf /tmp/nfpm.tar.gz -C /tmp nfpm
+          install /tmp/nfpm "$(go env GOPATH)/bin/nfpm"
 
       - name: Compute package version
         shell: bash
