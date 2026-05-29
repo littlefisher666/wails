@@ -71,7 +71,7 @@ jobs:
   build-windows:
     name: Build Windows
     needs: prepare-release-meta
-    runs-on: windows-2025
+    runs-on: windows-2025-vs2026
 
     steps:
       - name: Checkout source
@@ -89,11 +89,18 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           package-manager-cache: false
 
+      - name: Detect npm cache directory
+        id: windows-npm-cache-dir
+        shell: bash
+        run: |
+          CACHE_DIR="$(npm config get cache)"
+          echo "path=${CACHE_DIR}" >> "$GITHUB_OUTPUT"
+
       - name: Restore npm cache
         id: windows-npm-cache
         uses: actions/cache/restore@v5
         with:
-          path: ${{ env.LOCALAPPDATA }}\npm-cache
+          path: ${{ steps.windows-npm-cache-dir.outputs.path }}
           key: ${{ runner.os }}-npm-${{ hashFiles('frontend/package-lock.json') }}
           restore-keys: |
             ${{ runner.os }}-npm-
@@ -135,7 +142,7 @@ jobs:
         if: always() && steps.windows-npm-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@v5
         with:
-          path: ${{ env.LOCALAPPDATA }}\npm-cache
+          path: ${{ steps.windows-npm-cache-dir.outputs.path }}
           key: ${{ runner.os }}-npm-${{ hashFiles('frontend/package-lock.json') }}
 
       - name: Save Go modules cache
@@ -225,69 +232,53 @@ jobs:
           key: ${{ runner.os }}-go-${{ hashFiles('go.sum') }}
 
   build-linux-deb:
-    name: Build Linux Deb
+    name: Build Linux Deb (${{ matrix.ubuntu }}, ${{ matrix.arch }})
     strategy:
       fail-fast: false
       matrix:
         include:
-          - arch: amd64
+          - ubuntu: "20.04"
+            image: ubuntu:20.04
+            arch: amd64
             runner: ubuntu-24.04
-          - arch: arm64
+            webkit_dev_pkg: libwebkit2gtk-4.0-dev
+            wails_tags: ""
+          - ubuntu: "20.04"
+            image: ubuntu:20.04
+            arch: arm64
             runner: ubuntu-24.04-arm
+            webkit_dev_pkg: libwebkit2gtk-4.0-dev
+            wails_tags: ""
+          - ubuntu: "22.04"
+            image: ubuntu:22.04
+            arch: amd64
+            runner: ubuntu-24.04
+            webkit_dev_pkg: libwebkit2gtk-4.0-dev
+            wails_tags: ""
+          - ubuntu: "22.04"
+            image: ubuntu:22.04
+            arch: arm64
+            runner: ubuntu-24.04-arm
+            webkit_dev_pkg: libwebkit2gtk-4.0-dev
+            wails_tags: ""
+          - ubuntu: "24.04"
+            image: ubuntu:24.04
+            arch: amd64
+            runner: ubuntu-24.04
+            webkit_dev_pkg: libwebkit2gtk-4.1-dev
+            wails_tags: webkit2_41
+          - ubuntu: "24.04"
+            image: ubuntu:24.04
+            arch: arm64
+            runner: ubuntu-24.04-arm
+            webkit_dev_pkg: libwebkit2gtk-4.1-dev
+            wails_tags: webkit2_41
     needs: prepare-release-meta
     runs-on: ${{ matrix.runner }}
 
     steps:
       - name: Checkout source
         uses: actions/checkout@v5
-
-      - name: Setup Go
-        uses: actions/setup-go@v6
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: false
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          package-manager-cache: false
-
-      - name: Restore npm cache
-        id: linux-npm-cache
-        uses: actions/cache/restore@v5
-        with:
-          path: ~/.npm
-          key: ${{ runner.os }}-${{ matrix.arch }}-npm-${{ hashFiles('frontend/package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-${{ matrix.arch }}-npm-
-
-      - name: Restore Go modules cache
-        id: linux-go-cache
-        uses: actions/cache/restore@v5
-        with:
-          path: ~/go/pkg/mod
-          key: ${{ runner.os }}-${{ matrix.arch }}-go-${{ hashFiles('go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-${{ matrix.arch }}-go-
-
-      - name: Install Linux build dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            build-essential \
-            pkg-config \
-            libgtk-3-dev \
-            libwebkit2gtk-4.1-dev
-
-      - name: Install frontend dependencies
-        run: npm ci
-        working-directory: frontend
-
-      - name: Install Wails CLI and nfpm
-        run: |
-          go install github.com/wailsapp/wails/v2/cmd/wails@${{ env.WAILS_VERSION }}
-          go install github.com/goreleaser/nfpm/v2/cmd/nfpm@${{ env.NFPM_VERSION }}
 
       - name: Compute package version
         shell: bash
@@ -296,51 +287,88 @@ jobs:
           echo "PACKAGE_VERSION=${VERSION}" >> "$GITHUB_ENV"
           echo "PACKAGE_ARCH=${{ matrix.arch }}" >> "$GITHUB_ENV"
 
-      - name: Build Linux binary
+      - name: Build Linux deb in target Ubuntu container
         shell: bash
         run: |
-          export PATH="$PATH:$(go env GOPATH)/bin"
-          wails build -clean -platform linux/${{ matrix.arch }} -tags webkit2_41
+          set -euo pipefail
+          docker run --rm \
+            -e DEBIAN_FRONTEND=noninteractive \
+            -e GO_VERSION="${GO_VERSION}" \
+            -e NODE_VERSION="${NODE_VERSION}" \
+            -e WAILS_VERSION="${WAILS_VERSION}" \
+            -e NFPM_VERSION="${NFPM_VERSION}" \
+            -e PACKAGE_VERSION="${PACKAGE_VERSION}" \
+            -e PACKAGE_ARCH="${PACKAGE_ARCH}" \
+            -e WAILS_BUILD_TAGS="${{ matrix.wails_tags }}" \
+            -v "${PWD}:/workspace" \
+            -w /workspace \
+            "${{ matrix.image }}" \
+            bash -lc '
+              set -euo pipefail
+              apt-get update
+              apt-get install -y \
+                ca-certificates \
+                curl \
+                git \
+                gnupg \
+                build-essential \
+                pkg-config \
+                libgtk-3-dev \
+                ${{ matrix.webkit_dev_pkg }} \
+                xz-utils
 
-      - name: Package deb
-        shell: bash
-        run: |
-          export PATH="$PATH:$(go env GOPATH)/bin"
-          mkdir -p dist
-          nfpm package \
-            --packager deb \
-            --config build/linux/nfpm.yaml \
-            --target "dist/${APP_NAME}_${PACKAGE_VERSION}_${PACKAGE_ARCH}.deb"
+              case "${PACKAGE_ARCH}" in
+                amd64) GO_ARCH="amd64" ;;
+                arm64) GO_ARCH="arm64" ;;
+                *)
+                  echo "Unsupported build arch: ${PACKAGE_ARCH}"
+                  exit 1
+                  ;;
+              esac
+
+              curl -fsSL "https://go.dev/dl/go${GO_VERSION}.linux-${GO_ARCH}.tar.gz" -o /tmp/go.tgz
+              rm -rf /usr/local/go
+              tar -C /usr/local -xzf /tmp/go.tgz
+
+              curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+              apt-get install -y nodejs
+
+              export PATH="/usr/local/go/bin:${PATH}"
+              export GOPATH="/root/go"
+              export PATH="${GOPATH}/bin:${PATH}"
+
+              npm ci --prefix frontend
+              go install github.com/wailsapp/wails/v2/cmd/wails@${WAILS_VERSION}
+              go install github.com/goreleaser/nfpm/v2/cmd/nfpm@${NFPM_VERSION}
+
+              if [ -n "${WAILS_BUILD_TAGS}" ]; then
+                wails build -clean -platform "linux/${PACKAGE_ARCH}" -tags "${WAILS_BUILD_TAGS}"
+              else
+                wails build -clean -platform "linux/${PACKAGE_ARCH}"
+              fi
+
+              mkdir -p dist
+              nfpm package \
+                --packager deb \
+                --config build/linux/nfpm.yaml \
+                --target "dist/${APP_NAME}_${PACKAGE_VERSION}_ubuntu${{ matrix.ubuntu }}_${PACKAGE_ARCH}.deb"
+            '
 
       - name: Upload Linux artifacts
         uses: actions/upload-artifact@v6
         with:
-          name: linux-deb-artifacts-${{ matrix.arch }}
+          name: linux-deb-artifacts-ubuntu${{ matrix.ubuntu }}-${{ matrix.arch }}
           path: |
-            dist/*_${{ matrix.arch }}.deb
+            dist/*_ubuntu${{ matrix.ubuntu }}_${{ matrix.arch }}.deb
           if-no-files-found: error
 
       - name: Upload Linux binary artifacts
         uses: actions/upload-artifact@v6
         with:
-          name: linux-bin-artifacts-${{ matrix.arch }}
+          name: linux-bin-artifacts-ubuntu${{ matrix.ubuntu }}-${{ matrix.arch }}
           path: |
             build/bin/${{ env.BIN_NAME }}
           if-no-files-found: error
-
-      - name: Save npm cache
-        if: always() && steps.linux-npm-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v5
-        with:
-          path: ~/.npm
-          key: ${{ runner.os }}-${{ matrix.arch }}-npm-${{ hashFiles('frontend/package-lock.json') }}
-
-      - name: Save Go modules cache
-        if: always() && steps.linux-go-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v5
-        with:
-          path: ~/go/pkg/mod
-          key: ${{ runner.os }}-${{ matrix.arch }}-go-${{ hashFiles('go.sum') }}
 
   publish-release:
     name: Publish Release
