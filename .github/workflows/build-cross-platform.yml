@@ -15,9 +15,10 @@ permissions:
   contents: write
 
 env:
-  GO_VERSION: "1.23.0"
+  GO_VERSION: "1.25.0"
   NODE_VERSION: "20"
   WAILS_VERSION: "v2.12.0"
+  NFPM_VERSION: "v2.46.3"
   APP_NAME: "helloworld"
   BIN_NAME: "wails"
 
@@ -286,18 +287,7 @@ jobs:
       - name: Install Wails CLI and nfpm
         run: |
           go install github.com/wailsapp/wails/v2/cmd/wails@${{ env.WAILS_VERSION }}
-          NFP_VERSION="v2.46.3"
-          case "${{ matrix.arch }}" in
-            amd64) NFP_ARCH="x86_64" ;;
-            arm64) NFP_ARCH="arm64" ;;
-            *)
-              echo "Unsupported nfpm arch: ${{ matrix.arch }}"
-              exit 1
-              ;;
-          esac
-          curl -sSfL "https://github.com/goreleaser/nfpm/releases/download/${NFP_VERSION}/nfpm_${NFP_VERSION#v}_Linux_${NFP_ARCH}.tar.gz" -o /tmp/nfpm.tar.gz
-          tar -xzf /tmp/nfpm.tar.gz -C /tmp nfpm
-          install /tmp/nfpm "$(go env GOPATH)/bin/nfpm"
+          go install github.com/goreleaser/nfpm/v2/cmd/nfpm@${{ env.NFPM_VERSION }}
 
       - name: Compute package version
         shell: bash
