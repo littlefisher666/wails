@@ -291,6 +291,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          WORKSPACE_UID="$(id -u)"
+          WORKSPACE_GID="$(id -g)"
           docker run --rm \
             -e DEBIAN_FRONTEND=noninteractive \
             -e GO_VERSION="${GO_VERSION}" \
@@ -302,6 +304,8 @@ jobs:
             -e PACKAGE_ARCH="${PACKAGE_ARCH}" \
             -e GITHUB_REPOSITORY="${GITHUB_REPOSITORY}" \
             -e WAILS_BUILD_TAGS="${{ matrix.wails_tags }}" \
+            -e WORKSPACE_UID="${WORKSPACE_UID}" \
+            -e WORKSPACE_GID="${WORKSPACE_GID}" \
             -v "${PWD}:/workspace" \
             -w /workspace \
             "${{ matrix.image }}" \
@@ -354,6 +358,8 @@ jobs:
                 --packager deb \
                 --config build/linux/nfpm.yaml \
                 --target "dist/${APP_NAME}_${PACKAGE_VERSION}_ubuntu${{ matrix.ubuntu }}_${PACKAGE_ARCH}.deb"
+
+              chown -R "${WORKSPACE_UID}:${WORKSPACE_GID}" /workspace/build /workspace/dist
             '
 
       - name: Upload Linux artifacts
