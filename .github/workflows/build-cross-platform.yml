@@ -297,8 +297,10 @@ jobs:
             -e NODE_VERSION="${NODE_VERSION}" \
             -e WAILS_VERSION="${WAILS_VERSION}" \
             -e NFPM_VERSION="${NFPM_VERSION}" \
+            -e APP_NAME="${APP_NAME}" \
             -e PACKAGE_VERSION="${PACKAGE_VERSION}" \
             -e PACKAGE_ARCH="${PACKAGE_ARCH}" \
+            -e GITHUB_REPOSITORY="${GITHUB_REPOSITORY}" \
             -e WAILS_BUILD_TAGS="${{ matrix.wails_tags }}" \
             -v "${PWD}:/workspace" \
             -w /workspace \
