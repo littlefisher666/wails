@@ -229,6 +229,13 @@ jobs:
           name: linux-deb-artifacts
           path: |
             dist/*.deb
+          if-no-files-found: error
+
+      - name: Upload Linux binary artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-bin-artifacts
+          path: |
             build/bin/${{ env.BIN_NAME }}
           if-no-files-found: error
 
@@ -269,6 +276,6 @@ jobs:
           target_commitish: ${{ github.sha }}
           generate_release_notes: true
           files: |
-            release-assets/windows/*.exe
-            release-assets/macos/*.zip
-            release-assets/linux/*.deb
+            release-assets/windows/**/*.exe
+            release-assets/macos/**/*.zip
+            release-assets/linux/**/*.deb
