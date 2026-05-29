@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=helloworld
+Comment=Wails desktop application
+Exec=/opt/helloworld/wails
+Icon=helloworld
+Terminal=false
+Type=Application
+Categories=Utility;
+StartupNotify=true
