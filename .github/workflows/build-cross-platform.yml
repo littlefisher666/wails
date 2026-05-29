@@ -88,6 +88,24 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           package-manager-cache: false
 
+      - name: Restore npm cache
+        id: windows-npm-cache
+        uses: actions/cache/restore@v5
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-npm-${{ hashFiles('frontend/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-npm-
+
+      - name: Restore Go modules cache
+        id: windows-go-cache
+        uses: actions/cache/restore@v5
+        with:
+          path: ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
       - name: Install frontend dependencies
         run: npm ci
         working-directory: frontend
@@ -112,6 +130,20 @@ jobs:
             build/bin/*.exe
           if-no-files-found: error
 
+      - name: Save npm cache
+        if: always() && steps.windows-npm-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-npm-${{ hashFiles('frontend/package-lock.json') }}
+
+      - name: Save Go modules cache
+        if: always() && steps.windows-go-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('go.sum') }}
+
   build-macos:
     name: Build macOS
     needs: prepare-release-meta
@@ -132,6 +164,24 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           package-manager-cache: false
+
+      - name: Restore npm cache
+        id: macos-npm-cache
+        uses: actions/cache/restore@v5
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-npm-${{ hashFiles('frontend/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-npm-
+
+      - name: Restore Go modules cache
+        id: macos-go-cache
+        uses: actions/cache/restore@v5
+        with:
+          path: ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
 
       - name: Install frontend dependencies
         run: npm ci
@@ -158,6 +208,20 @@ jobs:
           path: |
             build/bin/${{ env.APP_NAME }}-macos-universal.zip
           if-no-files-found: error
+
+      - name: Save npm cache
+        if: always() && steps.macos-npm-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-npm-${{ hashFiles('frontend/package-lock.json') }}
+
+      - name: Save Go modules cache
+        if: always() && steps.macos-go-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('go.sum') }}
 
   build-linux-deb:
     name: Build Linux Deb
@@ -187,6 +251,24 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           package-manager-cache: false
+
+      - name: Restore npm cache
+        id: linux-npm-cache
+        uses: actions/cache/restore@v5
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-${{ matrix.arch }}-npm-${{ hashFiles('frontend/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ matrix.arch }}-npm-
+
+      - name: Restore Go modules cache
+        id: linux-go-cache
+        uses: actions/cache/restore@v5
+        with:
+          path: ~/go/pkg/mod
+          key: ${{ runner.os }}-${{ matrix.arch }}-go-${{ hashFiles('go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ matrix.arch }}-go-
 
       - name: Install Linux build dependencies
         run: |
@@ -244,6 +326,20 @@ jobs:
           path: |
             build/bin/${{ env.BIN_NAME }}
           if-no-files-found: error
+
+      - name: Save npm cache
+        if: always() && steps.linux-npm-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-${{ matrix.arch }}-npm-${{ hashFiles('frontend/package-lock.json') }}
+
+      - name: Save Go modules cache
+        if: always() && steps.linux-go-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: ~/go/pkg/mod
+          key: ${{ runner.os }}-${{ matrix.arch }}-go-${{ hashFiles('go.sum') }}
 
   publish-release:
     name: Publish Release
