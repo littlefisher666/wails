@@ -93,7 +93,7 @@ jobs:
         id: windows-npm-cache
         uses: actions/cache/restore@v5
         with:
-          path: ~/.npm
+          path: ${{ env.LOCALAPPDATA }}\npm-cache
           key: ${{ runner.os }}-npm-${{ hashFiles('frontend/package-lock.json') }}
           restore-keys: |
             ${{ runner.os }}-npm-
@@ -135,7 +135,7 @@ jobs:
         if: always() && steps.windows-npm-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@v5
         with:
-          path: ~/.npm
+          path: ${{ env.LOCALAPPDATA }}\npm-cache
           key: ${{ runner.os }}-npm-${{ hashFiles('frontend/package-lock.json') }}
 
       - name: Save Go modules cache
